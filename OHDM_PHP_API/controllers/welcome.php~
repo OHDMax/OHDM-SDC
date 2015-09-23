@@ -1,0 +1,19 @@
+<?php
+
+class welcome extends Controller {
+
+   public function __construct() {
+      parent::__construct();
+   }
+
+   public function index() {
+
+      session->init();
+
+      $data['title'] = 'Willkommen';
+
+      $this->_view->render('header', $data);
+      $this->_view->render('welcome/start_content', $data);
+      $this->_view->render('footer');
+   }
+}
