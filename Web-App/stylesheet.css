@@ -1,0 +1,57 @@
+html, body{
+    height:100%;
+    width: 100%;
+    margin: 0px;
+}
+
+.sidebar {
+    width: 100%;
+}
+
+.sidebar, .col-md-10 {
+    height: 100%;
+}
+
+#map {
+    height: 100%;
+}
+
+#sidebar {
+    height: 100%;
+}
+
+#sidebar1 {
+    margin-top: 15px;
+}
+
+.force-to-bottom {
+    position:absolute;
+    bottom: 5%;
+    width: 100%;
+}
+
+.form{
+    padding: 15px;
+}
+
+.form-group {
+    margin-left: 10px;
+}
+
+/*---*/
+
+.modal-footer {
+    padding: 0;
+}
+
+.modal-footer .btn-group button {
+    height:40px;
+    border-top-left-radius : 0;
+    border-top-right-radius : 0;
+    border: none;
+    border-right: 1px solid #ddd;
+}
+
+.modal-footer .btn-group:last-child > button {
+    border-right: 0;
+}

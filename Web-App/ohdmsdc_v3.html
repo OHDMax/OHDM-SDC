@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>OHDM</title>
+    <script src="lib/jquery.js"></script>
+    <link rel="stylesheet" href="lib/bootstrap.css">
+    <script src="lib/bootstrap.js"></script>
+    <link rel="stylesheet" href="lib/ol.css" type="text/css">
+    <script src="lib/ol.js"></script>
+    <link rel="stylesheet" href="stylesheet.css" type="text/css">
+</head>
+<body>
+<div class="row sidebar">
+    <div id="map" class="map col-md-10"><div id="popup"></div></div>
+    <div id="sidebar" class="col-md-2">
+        <div id="sidebar1">
+            <p>Click on a marker to see more information.</p>
+        </div>
+        <div id ="sidebar2">
+            <legend>Filters</legend>
+        </div>
+        <div class="force-to-bottom"><button data-toggle="modal" data-target="#squarespaceModal" class="btn btn-primary center-block">Add Measurement</button></div>
+        <!-- line modal -->
+        <div class="modal fade" id="squarespaceModal" tabindex="-1" role="dialog" aria-labelledby="modalLabel" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <button type="button" class="close" data-dismiss="modal"><span aria-hidden="true">×</span><span class="sr-only">Close</span></button>
+                        <h3 class="modal-title" id="lineModalLabel">Add Measurement</h3>
+                    </div>
+                    <div class="modal-body">
+
+                        <div class="row form">
+                                <form class="form-horizontal" role="form">
+                                    <fieldset>
+
+                                        <div class="form-group">
+                                            <label class="col-sm-2 control-label" for="latitude">Latitude</label>
+                                            <div class="col-sm-4">
+                                                <input type="text" id="latitude" placeholder="52.456" class="form-control">
+                                            </div>
+
+                                            <label class="col-sm-2 control-label" for="longitude">Longitude</label>
+                                            <div class="col-sm-4">
+                                                <input type="text" id="longitude" placeholder="13.526" class="form-control">
+                                            </div>
+                                        </div>
+
+                                        <div class="form-group">
+                                            <label class="col-sm-2 control-label" for="substance">Substance</label>
+                                            <div class="col-sm-10">
+                                                <input type="text" id="substance" placeholder="temperature" class="form-control">
+                                            </div>
+                                        </div>
+
+                                        <div class="form-group">
+                                            <label class="col-sm-2 control-label" for="value">Value</label>
+                                            <div class="col-sm-6">
+                                                <input type="text" id="value" placeholder="20" class="form-control">
+                                            </div>
+
+                                            <label class="col-sm-2 control-label" for="unit">Unit</label>
+                                            <div class="col-sm-2">
+                                                <input type="text" id="unit" placeholder="°C" class="form-control">
+                                            </div>
+                                        </div>
+
+                                        <div class="form-group">
+                                            <label class="col-sm-2 control-label" for="date">Date</label>
+                                            <div class="col-sm-4">
+                                                <input type="date" id="date" placeholder="MM/TT/YYYY" class="form-control">
+                                            </div>
+
+                                            <label class="col-sm-2 control-label" for="time">Time</label>
+                                            <div class="col-sm-4">
+                                                <input type="time" id="time" placeholder="hh:mm(:ss) (optional)" class="form-control">
+                                            </div>
+                                        </div>
+
+                                    </fieldset>
+                                </form>
+                        </div><!-- /.row -->
+
+                    </div>
+                    <div class="modal-footer">
+                        <div class="btn-group btn-group-justified" role="group" aria-label="group button">
+                            <div class="btn-group" role="group">
+                                <button type="button" class="btn btn-default" data-dismiss="modal"  role="button">Close</button>
+                            </div>
+                            <div class="btn-group" role="group">
+                                <button type="button" id="saveMeasurement" class="btn btn-default btn-hover-green" data-dismiss="modal" data-action="save" role="button">Save</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+    //---map------------------------------------------------------------------------------------------------------------
+    var vectorSource = new ol.source.Vector({
+        features: []
+    });
+
+    var vectorLayer = new ol.layer.Vector({
+        source: vectorSource
+    });
+
+    var rasterLayer = new ol.layer.Tile({
+        source: new ol.source.OSM()
+    });
+
+    var map = new ol.Map({
+        layers: [rasterLayer, vectorLayer],
+        target: document.getElementById('map'),
+        view: new ol.View({
+            center: ol.proj.transform([13.526, 52.456], 'EPSG:4326', 'EPSG:3857'),
+            zoom: 7
+        })
+    });
+
+    var element = document.getElementById('popup');
+
+    var popup = new ol.Overlay({
+        element: element,
+        positioning: 'bottom-center',
+        stopEvent: false
+    });
+    map.addOverlay(popup);
+
+    var iconStyle = new ol.style.Style({
+        image: new ol.style.Icon(/** @type {olx.style.IconOptions} */ ({
+            anchor: [0.5, 0.5],
+            anchorXUnits: 'fraction',
+            anchorYUnits: 'pixels',
+            opacity: 0.75,
+            src: 'red-dot.png',
+        }))
+    });
+
+    var url="";
+
+    //---data----------------------------------------------------------------------------------------------------------
+    var substances = new Object();
+    var draw = function(url) {
+        //var token = "74dc2f347d73ef4fbec38de0429b1357fcb5687f1879495c6e2bf289f6d3411eb391bf4bd2608176749040478bdac6fb5566543cedc9b963114a3b4cc98a032f";
+        var xmlhttp = new XMLHttpRequest();
+        xmlhttp.onreadystatechange = function () {
+            if (xmlhttp.readyState == 4 && xmlhttp.status == 200) {
+                vectorSource.clear();
+                var json = JSON.parse(xmlhttp.responseText);
+                //Marker
+                for (var i = 0; i < json.length; i++) {
+                    if (substances[json[i].tagDates[0].tags.substance] !== 1) {
+                        var coordinates = parseMultipoint(json[i].geometricObjects[0].multipoint);
+                        console.log(coordinates);
+                        var measure_date = new Date(json[i].tagDates[0].tags.timestamp*1000);
+                        var date_string = measure_date.getDate() + "." + (measure_date.getMonth() + 1) + "." + measure_date.getFullYear() + " " + measure_date.getHours() + ":" + measure_date.getMinutes() + ":" + measure_date.getSeconds();
+                        console.log("timestamp:" + json[i].tagDates[0].tags.timestamp);
+
+                        var iconFeature = new ol.Feature({
+                            geometry: new ol.geom.Point(ol.proj.transform([coordinates[0], coordinates[1]], 'EPSG:4326', 'EPSG:3857')),
+                            id: json[i].geographicObjectId,
+                            substance: json[i].tagDates[0].tags.substance,
+                            value: json[i].tagDates[0].tags.value,
+                            unit: json[i].tagDates[0].tags.unit,
+                            date: date_string
+                        });
+                        iconFeature.setStyle(iconStyle);
+                        vectorSource.addFeature(iconFeature);
+
+                        var newsubstance = true;
+                        for (var s in substances) {
+                            if (substances.hasOwnProperty(s) && json[i].tagDates[0].tags.substance === s) {
+                                newsubstance = false;
+                                break;
+                            }
+                        }
+                        if (newsubstance) {
+                            substances[json[i].tagDates[0].tags.substance] = null;
+                            createCheckbox(json[i].tagDates[0].tags.substance);
+                        }
+                    }
+                }
+            }
+        }
+        xmlhttp.open("GET", url, true);
+        //xmlhttp.setRequestHeader("Authorization", "Bearer " + token);
+        //xmlhttp.setRequestHeader("Content-Type", "application/json; charset=utf-8");
+        //xmlhttp.setRequestHeader("Accept", "application/json");
+        xmlhttp.send();
+    };
+
+    var createCheckbox = function(substance){
+        var checkbox = document.createElement('input');
+        checkbox.type = "checkbox";
+        checkbox.id = substance;
+        checkbox.checked = "checked";
+        checkbox.addEventListener('click', function () {
+            if (this.checked) {
+                substances[this.id] = null;
+            } else {
+                substances[this.id] = 1;
+            }
+            draw(url);
+        });
+
+        var label = document.createElement('label');
+        label.htmlFor = substance;
+        label.appendChild(checkbox);
+        label.appendChild(document.createTextNode(substance));
+
+        var div = document.createElement('div');
+        div.className = "checkbox";
+        div.appendChild(label);
+
+        document.getElementById('sidebar2').appendChild(div);
+    };
+
+    var parseMultipoint = function(multipoint){
+        var coordinates = [];
+        coordinates[0] = "";
+        coordinates[1] = "";
+        coordinates[2] = "";
+        var j = 0;
+        var character
+        for (var i = 0; i < multipoint.length; i++){
+            character = multipoint.charAt(i);
+            if (character === ';'){
+                i+=12;
+                character = multipoint.charAt(i);
+            }
+            if (i > 13){
+                if (character !== " " && character !== ")"){
+                    coordinates[j] += character;
+                } else {
+                    j++;
+                }
+            }
+        }
+        coordinates[0] = parseFloat(coordinates[0]);
+        coordinates[1] = parseFloat(coordinates[1]);
+        coordinates[2] = parseFloat(coordinates[2]);
+        return coordinates;
+    };
+
+    var putMyData = function (json) {
+       var jqxhr = $.ajax({
+            contentType: 'application/json',
+            data: JSON.stringify(json),
+            dataType: 'json',
+            type: 'PUT',
+            url: 'https://studi.f4.htw-berlin.de/~s0544210/OHDM_PHP_API/SDC/create'
+        })
+                .done(function (){
+                    console.log("Data succesfully put")})
+                .fail(function () {
+                    console.log("Error while putting")})
+                .always(function(){
+                    console.log(jqxhr.responseText);
+                    console.log(jqxhr.status)
+                });
+    };
+
+    //---handlers-------------------------------------------------------------------------------------------------------
+    map.on("moveend", function(evt){
+        var extent = map.getView().calculateExtent(map.getSize());;
+        extent = ol.proj.transformExtent(extent, 'EPSG:3857', 'EPSG:4326');
+        console.log(extent);
+
+        var center = ol.extent.getCenter(extent);
+        console.log(center);
+
+        var topLeft = ol.extent.getTopLeft(extent);
+        console.log(topLeft);
+
+        var wgs84Sphere = new ol.Sphere(6378137);
+        var distance = Math.round(wgs84Sphere.haversineDistance(topLeft,center));
+        console.log(distance);
+
+        url = "https://studi.f4.htw-berlin.de/~s0544210/OHDM_PHP_API/SDC/get/" + center[0] + "/" + center[1] + "/"+ distance;
+        console.log(url);
+
+        draw(url);
+    });
+
+    // display popup on click
+    map.on('click', function(evt) {
+        var feature = map.forEachFeatureAtPixel(evt.pixel,
+                function(feature, layer) {
+                    return feature;
+                });
+        if (feature) {
+            /*var geometry = feature.getGeometry();
+            var coord = geometry.getCoordinates();
+            coord[1] += 0;
+            popup.setPosition(coord);
+            $(element).popover({
+                'placement': 'top',
+                'html': true,
+            });
+            $(element).data('bs.popover').options.content = feature.get('substance');
+            $(element).popover('show');*/
+            var coordinates = ol.proj.transform([feature.getGeometry().getCoordinates()[0], feature.getGeometry().getCoordinates()[1]], 'EPSG:3857', 'EPSG:4326');
+            document.getElementById("sidebar1").innerHTML = "<table class=\"table\">" +
+                    "<tr><th>ID</th><td>" + feature.get('id') + "</td></tr>" +
+                    "<tr><th>Longitude</th><td>" + coordinates[0] + "</td></tr>" +
+                    "<tr><th>Latitude</th><td>" + coordinates[1] + "</td></tr>" +
+                    "<tr><th>Substance</th><td>" + feature.get('substance') + "</td></tr>" +
+                    "<tr><th>Value</th><td>" + feature.get('value') + " " + feature.get('unit') +"</td></tr>" +
+                    "<tr><th>Date</th><td>" + feature.get('date') + "</td></tr>" +
+                    "<table>";
+        } else {
+            //$(element).popover('destroy');
+        }
+    });
+
+    // change mouse cursor when over marker
+    map.on('pointermove', function(e) {
+        var pixel = map.getEventPixel(e.originalEvent);
+        var hit = map.hasFeatureAtPixel(pixel);
+        map.getTarget().style.cursor = hit ? 'pointer' : '';
+    });
+
+    var button = document.getElementById('saveMeasurement');
+    button.addEventListener('click', function(){
+        out = {
+            lon: document.getElementById('longitude').value,
+            lat: document.getElementById('latitude').value,
+            substance: document.getElementById('substance').value,
+            value: document.getElementById('value').value,
+            unit: document.getElementById('unit').value,
+            timestamp: Date.parse(document.getElementById('date').value + " " + document.getElementById('time').value)/1000
+        };
+        console.log(document.getElementById('date').value + " " + document.getElementById('time').value);
+        date = new Date(out.timestamp*1000);
+        console.log(date.getDate() + "." + (date.getMonth() + 1) + "." + date.getYear() + " " + date.getHours() + ":" + date.getMinutes() + ":" + date.getSeconds());
+        console.log(out);
+        putMyData(out);
+    });
+
+</script>
+</body>
+</html>
